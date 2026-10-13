@@ -14,8 +14,8 @@ Stellar Wave, include `Closes #<issue>` in the PR description.
 ## Node versions
 
 - **Develop against Node 22.** The repo pins it in [`.nvmrc`](.nvmrc), and it is
-  the version CI runs every step with. ESLint 9 requires Node >= 22, which is
-  why the lint step is not lower.
+  the version CI runs every step with. ESLint 9 does not require Node >= 22;
+  Node 22 is the repository's development and CI pin.
 - **`package.json` declares `engines: >= 20`, and CI no longer tests that.**
   The `test` job used to run a `['20', '22']` matrix; it is now one `ci` job on
   22. So your code should still run on 20, but CI will not prove it — if the
