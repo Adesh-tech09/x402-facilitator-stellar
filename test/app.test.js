@@ -953,7 +953,9 @@ describe('transport hardening', () => {
     await withApp({ nodeEnv: 'production' }, async app => {
       const res = await app.get('/healthz');
       assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
-      assert.match(res.headers.get('strict-transport-security'), /max-age=31536000/);
+      assert.match(res.headers.get('strict-transport-security'), /max-age=63072000/);
+      assert.match(res.headers.get('strict-transport-security'), /includeSubDomains/);
+      assert.match(res.headers.get('strict-transport-security'), /preload/);
     });
     await withApp({}, async app => {
       const res = await app.get('/healthz');

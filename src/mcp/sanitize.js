@@ -251,3 +251,75 @@ export function frameUntrusted(
     .filter(line => line !== null)
     .join('\n');
 }
+
+/**
+ * Audit log entry for MCP tool execution.
+ *
+ * @typedef {object} ToolAuditEntry
+ * @property {string} toolName - name of the tool executed
+ * @property {object} parameters - sanitized tool parameters (secrets redacted)
+ * @property {number} startTime - execution start timestamp (ms since epoch)
+ * @property {number} endTime - execution end timestamp (ms since epoch)
+ * @property {number} durationMs - execution duration in milliseconds
+ * @property {boolean} success - whether the tool execution succeeded
+ * @property {string} [error] - error message if execution failed
+ */
+
+/**
+ * Creates a tool execution audit logger.
+ *
+ * @param {Function} auditFn - audit function to call with the log entry
+ * @returns {Function} a wrapper that logs tool execution with parameters and timing
+ */
+export function createToolAuditLogger(auditFn) {
+  return async (toolName, params, handler) => {
+    const startTime = Date.now();
+    const sanitizedParams = sanitizeParamsForAudit(params);
+    let success = true;
+    let error = null;
+    try {
+      const result = await handler(params);
+      return result;
+    } catch (err) {
+      success = false;
+      error = err instanceof Error ? err.message : String(err);
+      throw err;
+    } finally {
+      const endTime = Date.now();
+      const entry = {
+        toolName,
+        parameters: sanitizedParams,
+        startTime,
+        endTime,
+        durationMs: endTime - startTime,
+        success,
+        error,
+      };
+      auditFn('mcp_tool_execution', entry);
+    }
+  };
+}
+
+/**
+ * Sanitizes parameters for audit logging by redacting sensitive fields.
+ *
+ * @param {object} params - tool parameters
+ * @returns {object} sanitized parameters
+ */
+export function sanitizeParamsForAudit(params) {
+  if (!params || typeof params !== 'object') return params;
+
+  const redacted = { ...params };
+  const sensitiveKeys = ['secret', 'key', 'token', 'password', 'private', 'authorization'];
+
+  for (const key of Object.keys(redacted)) {
+    const lowerKey = key.toLowerCase();
+    if (sensitiveKeys.some(s => lowerKey.includes(s))) {
+      redacted[key] = '[REDACTED]';
+    } else if (typeof redacted[key] === 'object' && redacted[key] !== null) {
+      redacted[key] = sanitizeParamsForAudit(redacted[key]);
+    }
+  }
+
+  return redacted;
+}
