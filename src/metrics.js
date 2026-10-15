@@ -230,7 +230,7 @@ export function createMetrics() {
 
   const projectionThroughput = new Gauge(
     'x402_projection_throughput_events_per_second',
-    'Event processing throughput (events/second).',
+    'Projection throughput in events/second, observed over the most recent completed projection batch (its processed count divided by its wall duration); the worker in src/settlement-cqrs.js sets it, so averaging the scrape across polls reconstructs the steady-state rate.',
     [],
   );
   projectionThroughput.set({}, 0);
