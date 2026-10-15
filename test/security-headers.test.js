@@ -98,8 +98,19 @@ describe('security headers: error responses', () => {
     });
     try {
       const res = await app.post('/verify', {
-        paymentPayload: { x402Version: 2, scheme: 'exact', network: 'stellar:testnet', payload: { transaction: 'TX' } },
-        paymentRequirements: { scheme: 'exact', network: 'stellar:testnet', asset: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC', maxAmountRequired: '1000', payTo: 'GCALKSGAZRJLSUEJT3M5W6LN4R7XQOLIRCOS6ZA6EDZVTZDBIIPPFKJ6' },
+        paymentPayload: {
+          x402Version: 2,
+          scheme: 'exact',
+          network: 'stellar:testnet',
+          payload: { transaction: 'TX' },
+        },
+        paymentRequirements: {
+          scheme: 'exact',
+          network: 'stellar:testnet',
+          asset: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+          maxAmountRequired: '1000',
+          payTo: 'GCALKSGAZRJLSUEJT3M5W6LN4R7XQOLIRCOS6ZA6EDZVTZDBIIPPFKJ6',
+        },
       });
       assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
       assert.equal(res.headers.get('x-frame-options'), 'DENY');

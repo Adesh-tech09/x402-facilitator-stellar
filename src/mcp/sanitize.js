@@ -308,10 +308,10 @@ export function createToolAuditLogger(auditFn) {
  */
 export function sanitizeParamsForAudit(params) {
   if (!params || typeof params !== 'object') return params;
-  
+
   const redacted = { ...params };
   const sensitiveKeys = ['secret', 'key', 'token', 'password', 'private', 'authorization'];
-  
+
   for (const key of Object.keys(redacted)) {
     const lowerKey = key.toLowerCase();
     if (sensitiveKeys.some(s => lowerKey.includes(s))) {
@@ -320,6 +320,6 @@ export function sanitizeParamsForAudit(params) {
       redacted[key] = sanitizeParamsForAudit(redacted[key]);
     }
   }
-  
+
   return redacted;
 }

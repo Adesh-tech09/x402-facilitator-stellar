@@ -22,10 +22,7 @@ const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
  * @throws {McpInputError} if execution fails, times out, or exceeds limits
  */
 export async function executeInSandbox(handler, params, options = {}) {
-  const {
-    timeoutMs = DEFAULT_TIMEOUT_MS,
-    maxPayloadSize = MAX_PAYLOAD_SIZE,
-  } = options;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, maxPayloadSize = MAX_PAYLOAD_SIZE } = options;
 
   if (isMainThread) {
     return executeInWorker(handler, params, { timeoutMs, maxPayloadSize });
@@ -80,7 +77,7 @@ function executeInWorker(handler, params, options) {
     `;
 
     const handlerCode = handler.toString();
-    
+
     if (handlerCode.length > 50000) {
       throw new McpInputError('handler too large for sandbox execution');
     }
@@ -104,33 +101,35 @@ function executeInWorker(handler, params, options) {
       }
     }, options.timeoutMs + 1000);
 
-    worker.on('message', (msg) => {
+    worker.on('message', msg => {
       if (completed) return;
       completed = true;
       clearTimeout(timeout);
       worker.terminate().catch(() => {});
-      
+
       if (msg.error) {
         if (msg.error === 'execution_timeout') {
           reject(new McpInputError('tool execution timed out', { field: 'timeout' }));
         } else if (msg.error === 'payload_too_large') {
           reject(new McpInputError('tool result exceeds maximum size', { field: 'payload_size' }));
         } else {
-          reject(new McpInputError(`tool execution failed: ${msg.message}`, { field: 'execution' }));
+          reject(
+            new McpInputError(`tool execution failed: ${msg.message}`, { field: 'execution' }),
+          );
         }
       } else {
         resolve(msg.result);
       }
     });
 
-    worker.on('error', (err) => {
+    worker.on('error', err => {
       if (completed) return;
       completed = true;
       clearTimeout(timeout);
       reject(new McpInputError(`sandbox error: ${err.message}`, { field: 'sandbox' }));
     });
 
-    worker.on('exit', (code) => {
+    worker.on('exit', code => {
       if (completed) return;
       completed = true;
       clearTimeout(timeout);
@@ -170,9 +169,11 @@ async function executeDirectly(handler, params, options) {
  */
 export const INJECTION_PATTERNS = {
   pathTraversal: /\.\.[/\\]|~[/\\]|[/\\](?:etc|proc|sys|dev|var|tmp|root|home)[/\\]/i,
-  sqlInjection: /\b(?:union|select|insert|update|delete|drop|create|alter|exec|execute)\b.*\b(?:from|into|table|database|values|set|where)\b/i,
+  sqlInjection:
+    /\b(?:union|select|insert|update|delete|drop|create|alter|exec|execute)\b.*\b(?:from|into|table|database|values|set|where)\b/i,
   scriptInjection: /<script|javascript:|on\w+\s*=/i,
-  commandInjection: /[;&|`$(){}[\]<>]|\b(?:rm|cat|ls|cp|mv|chmod|chown|wget|curl|nc|bash|sh|python|perl|ruby|node)\b/i,
+  commandInjection:
+    /[;&|`$(){}[\]<>]|\b(?:rm|cat|ls|cp|mv|chmod|chown|wget|curl|nc|bash|sh|python|perl|ruby|node)\b/i,
 };
 
 /**
@@ -187,10 +188,10 @@ export function validateAgainstInjection(value, fieldName) {
 
   for (const [type, pattern] of Object.entries(INJECTION_PATTERNS)) {
     if (pattern.test(value)) {
-      throw new McpInputError(
-        `'${fieldName}' contains potentially malicious content (${type})`,
-        { field: fieldName, injectionType: type },
-      );
+      throw new McpInputError(`'${fieldName}' contains potentially malicious content (${type})`, {
+        field: fieldName,
+        injectionType: type,
+      });
     }
   }
 }
@@ -235,7 +236,7 @@ export const DEFAULT_SANDBOX_CONFIG = {
 export function createSandboxedTool(handler, config = {}) {
   const sandboxConfig = { ...DEFAULT_SANDBOX_CONFIG, ...config };
 
-  return async (params) => {
+  return async params => {
     if (sandboxConfig.validateInput) {
       validateObjectAgainstInjection(params);
     }

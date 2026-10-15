@@ -42,12 +42,7 @@ class JwksCache {
 const jwksCache = new JwksCache();
 
 export function createJwtVerifier(jwksUri, options = {}) {
-  const {
-    issuer = null,
-    audience = null,
-    clockTolerance = 30,
-    requiredScopes = [],
-  } = options;
+  const { issuer = null, audience = null, clockTolerance = 30, requiredScopes = [] } = options;
 
   async function verifyToken(token) {
     let jwks = jwksCache.get(jwksUri);
@@ -71,10 +66,14 @@ export function createJwtVerifier(jwksUri, options = {}) {
 
   async function verifyAndExtractScopes(token) {
     const payload = await verifyToken(token);
-    const scopes = Array.isArray(payload.scp) ? payload.scp : 
-                   Array.isArray(payload.scope) ? payload.scope.split(' ') :
-                   typeof payload.scope === 'string' ? payload.scope.split(' ') : [];
-    
+    const scopes = Array.isArray(payload.scp)
+      ? payload.scp
+      : Array.isArray(payload.scope)
+        ? payload.scope.split(' ')
+        : typeof payload.scope === 'string'
+          ? payload.scope.split(' ')
+          : [];
+
     for (const required of requiredScopes) {
       if (!scopes.includes(required)) {
         throw new Error(`missing_required_scope: ${required}`);
@@ -89,7 +88,7 @@ export function createJwtVerifier(jwksUri, options = {}) {
 
 export function createAuthMiddlewareWithJwt({ config, audit }) {
   const { apiKeys = [] } = config;
-  
+
   const jwtConfig = config.jwt ?? {};
   let jwtVerifier = null;
   if (jwtConfig.jwksUri) {
@@ -117,11 +116,11 @@ export function createAuthMiddlewareWithJwt({ config, audit }) {
 
     if (authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
-      
+
       if (jwtVerifier && token.includes('.')) {
         try {
           const { payload, scopes } = await jwtVerifier.verifyAndExtractScopes(token);
-          
+
           const keyId = payload.sub ?? payload.azp ?? 'jwt';
           if (req.span) req.span.keyId = keyId;
           req.keyId = keyId.toUpperCase();
@@ -184,8 +183,8 @@ export function createAuthMiddlewareWithJwt({ config, audit }) {
   function requireScope(...scopes) {
     return async (req, reply) => {
       if (!req.scopes || !scopes.every(s => req.scopes.includes(s))) {
-        audit('auth_failure', { 
-          actor: req.keyId ?? `ip:${req.ip}`, 
+        audit('auth_failure', {
+          actor: req.keyId ?? `ip:${req.ip}`,
           reason: 'insufficient_scope',
           required: scopes,
           granted: req.scopes ?? [],

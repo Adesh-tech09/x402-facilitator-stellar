@@ -84,10 +84,7 @@ test('MCP Input Sanitization & Validation', async t => {
   });
 
   await t.test('assertSafeText validates required field', () => {
-    assert.throws(
-      () => assertSafeText('', { field: 'test', required: true }),
-      /test.*required/,
-    );
+    assert.throws(() => assertSafeText('', { field: 'test', required: true }), /test.*required/);
   });
 
   await t.test('assertSafeText validates max length', () => {
@@ -99,7 +96,12 @@ test('MCP Input Sanitization & Validation', async t => {
 
   await t.test('assertSafeText validates pattern', () => {
     assert.throws(
-      () => assertSafeText('invalid', { field: 'test', pattern: /^[0-9]+$/, patternHint: 'digits only' }),
+      () =>
+        assertSafeText('invalid', {
+          field: 'test',
+          pattern: /^[0-9]+$/,
+          patternHint: 'digits only',
+        }),
       /malformed.*digits only/,
     );
   });
@@ -107,41 +109,26 @@ test('MCP Input Sanitization & Validation', async t => {
   await t.test('assertTransactionHash validates 64 hex chars', () => {
     const valid = 'a'.repeat(64);
     assert.equal(assertTransactionHash(valid), valid);
-    
-    assert.throws(
-      () => assertTransactionHash('invalid'),
-      /malformed/,
-    );
-    
-    assert.throws(
-      () => assertTransactionHash('a'.repeat(65)),
-      /at most 64 characters/,
-    );
+
+    assert.throws(() => assertTransactionHash('invalid'), /malformed/);
+
+    assert.throws(() => assertTransactionHash('a'.repeat(65)), /at most 64 characters/);
   });
 
   await t.test('assertNetwork validates stellar network', () => {
     assert.equal(assertNetwork('stellar:testnet'), 'stellar:testnet');
     assert.equal(assertNetwork('stellar:pubnet'), 'stellar:pubnet');
-    
-    assert.throws(
-      () => assertNetwork('stellar:invalid'),
-      /malformed/,
-    );
+
+    assert.throws(() => assertNetwork('stellar:invalid'), /malformed/);
   });
 
   await t.test('assertHttpUrl validates http/https only', () => {
     const url = assertHttpUrl('https://example.com');
     assert.equal(url.protocol, 'https:');
-    
-    assert.throws(
-      () => assertHttpUrl('file:///etc/passwd'),
-      /must use one of/,
-    );
-    
-    assert.throws(
-      () => assertHttpUrl('javascript:alert(1)'),
-      /must use one of/,
-    );
+
+    assert.throws(() => assertHttpUrl('file:///etc/passwd'), /must use one of/);
+
+    assert.throws(() => assertHttpUrl('javascript:alert(1)'), /must use one of/);
   });
 
   await t.test('frameUntrusted frames and bounds content', () => {
@@ -158,7 +145,7 @@ test('MCP Injection Guards', async t => {
       () => validateAgainstInjection('test; rm -rf /', 'field'),
       /commandInjection|pathTraversal/,
     );
-    
+
     assert.throws(
       () => validateAgainstInjection('test && cat /etc/passwd', 'field'),
       /commandInjection|pathTraversal/,
@@ -166,11 +153,8 @@ test('MCP Injection Guards', async t => {
   });
 
   await t.test('validateAgainstInjection detects path traversal', () => {
-    assert.throws(
-      () => validateAgainstInjection('../../../etc/passwd', 'field'),
-      /pathTraversal/,
-    );
-    
+    assert.throws(() => validateAgainstInjection('../../../etc/passwd', 'field'), /pathTraversal/);
+
     assert.throws(
       () => validateAgainstInjection('..\\..\\windows\\system32', 'field'),
       /pathTraversal/,
@@ -182,11 +166,8 @@ test('MCP Injection Guards', async t => {
       () => validateAgainstInjection('SELECT * FROM users WHERE id = 1', 'field'),
       /sqlInjection/,
     );
-    
-    assert.throws(
-      () => validateAgainstInjection('1; DROP TABLE users--', 'field'),
-      /sqlInjection/,
-    );
+
+    assert.throws(() => validateAgainstInjection('1; DROP TABLE users--', 'field'), /sqlInjection/);
   });
 
   await t.test('validateAgainstInjection detects script injection', () => {
@@ -194,7 +175,7 @@ test('MCP Injection Guards', async t => {
       () => validateAgainstInjection('<script>alert(1)</script>', 'field'),
       /scriptInjection/,
     );
-    
+
     assert.throws(
       () => validateAgainstInjection('javascript:alert(1)', 'field'),
       /scriptInjection/,
@@ -206,7 +187,7 @@ test('MCP Injection Guards', async t => {
       () => validateObjectAgainstInjection({ user: { input: 'test; rm -rf /' } }),
       /commandInjection/,
     );
-    
+
     assert.throws(
       () => validateObjectAgainstInjection({ items: ['safe', 'bad; cmd'] }),
       /commandInjection/,
@@ -214,17 +195,19 @@ test('MCP Injection Guards', async t => {
   });
 
   await t.test('validateObjectAgainstInjection allows safe input', () => {
-    assert.doesNotThrow(() => validateObjectAgainstInjection({ 
-      url: 'https://example.com',
-      name: 'test',
-      count: 42,
-    }));
+    assert.doesNotThrow(() =>
+      validateObjectAgainstInjection({
+        url: 'https://example.com',
+        name: 'test',
+        count: 42,
+      }),
+    );
   });
 });
 
 test('MCP Sandbox Execution', async t => {
   await t.test('executeInSandbox runs simple handler', async () => {
-    const handler = async (params) => ({ result: params.value * 2 });
+    const handler = async params => ({ result: params.value * 2 });
     const result = await executeInSandbox(handler, { value: 21 });
     assert.equal(result.result, 42);
   });
@@ -234,7 +217,7 @@ test('MCP Sandbox Execution', async t => {
       await new Promise(r => setTimeout(r, 1000));
       return { done: true };
     };
-    
+
     await assert.rejects(
       executeInSandbox(handler, {}, { timeoutMs: 100 }),
       /timed out|execution_timeout/,
@@ -243,7 +226,7 @@ test('MCP Sandbox Execution', async t => {
 
   await t.test('executeInSandbox enforces payload size limit', async () => {
     const handler = async () => ({ data: 'x'.repeat(2000000) });
-    
+
     await assert.rejects(
       executeInSandbox(handler, {}, { maxPayloadSize: 1000 }),
       /exceeds maximum size|payload_too_large/,
@@ -251,19 +234,16 @@ test('MCP Sandbox Execution', async t => {
   });
 
   await t.test('createSandboxedTool validates input', async () => {
-    const handler = async (params) => ({ result: params.input });
+    const handler = async params => ({ result: params.input });
     const sandboxed = createSandboxedTool(handler, { validateInput: true });
-    
-    await assert.rejects(
-      sandboxed({ input: 'test; rm -rf /' }),
-      /commandInjection/,
-    );
+
+    await assert.rejects(sandboxed({ input: 'test; rm -rf /' }), /commandInjection/);
   });
 
   await t.test('createSandboxedTool allows safe input', async () => {
-    const handler = async (params) => ({ result: params.input });
+    const handler = async params => ({ result: params.input });
     const sandboxed = createSandboxedTool(handler, { validateInput: true });
-    
+
     const result = await sandboxed({ input: 'safe input' });
     assert.equal(result.result, 'safe input');
   });
@@ -274,12 +254,12 @@ test('MCP Tool Audit Logging', async t => {
     const logs = [];
     const auditFn = (event, entry) => logs.push({ event, ...entry });
     const logger = createToolAuditLogger(auditFn);
-    
-    await logger('test_tool', { input: 'test' }, async (params) => {
+
+    await logger('test_tool', { input: 'test' }, async params => {
       await new Promise(r => setTimeout(r, 10));
       return { output: params.input };
     });
-    
+
     assert.equal(logs.length, 1);
     assert.equal(logs[0].event, 'mcp_tool_execution');
     assert.equal(logs[0].toolName, 'test_tool');
@@ -292,7 +272,7 @@ test('MCP Tool Audit Logging', async t => {
     const logs = [];
     const auditFn = (event, entry) => logs.push({ event, ...entry });
     const logger = createToolAuditLogger(auditFn);
-    
+
     try {
       await logger('failing_tool', { input: 'test' }, async () => {
         throw new Error('tool failed');
@@ -300,7 +280,7 @@ test('MCP Tool Audit Logging', async t => {
     } catch {
       // expected
     }
-    
+
     assert.equal(logs.length, 1);
     assert.equal(logs[0].success, false);
     assert.ok(logs[0].error.includes('tool failed'));
@@ -316,9 +296,9 @@ test('MCP Tool Audit Logging', async t => {
         safe: 'ok',
       },
     };
-    
+
     const sanitized = sanitizeParamsForAudit(params);
-    
+
     assert.equal(sanitized.apiKey, '[REDACTED]');
     assert.equal(sanitized.password, '[REDACTED]');
     assert.equal(sanitized.normalField, 'value');

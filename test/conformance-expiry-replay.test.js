@@ -143,7 +143,7 @@ describe('Ledger-based Expiration & Replay Resistance (#159)', () => {
     const promises = Array.from({ length: concurrentRequests }, () =>
       app.post('/settle', body, {
         authorization: 'Bearer s3cret-0123456789abcdefghijklmnopqrstuvwxyz',
-      })
+      }),
     );
 
     const results = await Promise.all(promises);
@@ -165,7 +165,11 @@ describe('Ledger-based Expiration & Replay Resistance (#159)', () => {
     const bodies = await Promise.all(results.map(r => r.json()));
     const firstTx = bodies[0].transaction;
     for (const body of bodies) {
-      assert.equal(body.transaction, firstTx, 'all concurrent requests must return the same transaction');
+      assert.equal(
+        body.transaction,
+        firstTx,
+        'all concurrent requests must return the same transaction',
+      );
     }
   });
 });
