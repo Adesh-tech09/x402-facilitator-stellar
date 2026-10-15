@@ -17,7 +17,7 @@ import { buildSettlementStore } from './store/index.js';
 import { registerDlqRoutes } from './dlq/routes.js';
 import { annotateSpan, withRequestSpan, tracedSchemeCall } from './tracing.js';
 import { createCorsHook, createPreflightHandler } from './cors.js';
-import { createAuthMiddleware } from './auth.js';
+import { createAuthMiddlewareWithJwt } from './auth-http.js';
 import { handleRateLimit, rejectRateLimited } from './rate-limit-http.js';
 import { applyDiscoveryCache } from './catalog/discovery-cache.js';
 import {
@@ -187,8 +187,10 @@ export async function createApp(
 
   app.addHook('onRequest', async (req, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     if (config.nodeEnv === 'production') {
-      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      reply.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
     }
   });
 
@@ -207,7 +209,7 @@ export async function createApp(
 
   const cors = createCorsHook(config.cors);
   const preflight = createPreflightHandler(config.cors);
-  const { requireApiKey, requireApiKeyStrict } = createAuthMiddleware({ config, audit });
+  const { requireApiKey, requireApiKeyStrict } = createAuthMiddlewareWithJwt({ config, audit });
 
   /**
    * Writes the bounded EXTENSION-RESPONSES header (#202).

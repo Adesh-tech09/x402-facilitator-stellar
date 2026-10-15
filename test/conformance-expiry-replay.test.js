@@ -133,4 +133,39 @@ describe('Ledger-based Expiration & Replay Resistance (#159)', () => {
     const secondBody = await second.json();
     assert.equal(firstBody.transaction, secondBody.transaction);
   });
+
+  test('concurrent duplicate authorizations from identical keypair trigger mutual exclusion', async () => {
+    const body = bodyWithExpirationLedger('far_future_concurrent');
+    const beforeCalls = capture.calls;
+
+    // Fire multiple concurrent settle requests with the same payload
+    const concurrentRequests = 5;
+    const promises = Array.from({ length: concurrentRequests }, () =>
+      app.post('/settle', body, {
+        authorization: 'Bearer s3cret-0123456789abcdefghijklmnopqrstuvwxyz',
+      })
+    );
+
+    const results = await Promise.all(promises);
+
+    // All requests should succeed
+    for (const res of results) {
+      assert.equal(res.status, 200);
+    }
+
+    // The settlement store must have invoked the scheme only once
+    // due to the distributed lock on the idempotency key
+    assert.equal(
+      capture.calls,
+      beforeCalls + 1,
+      'concurrent identical requests must be serialized by the lock, not re-submitted',
+    );
+
+    // All responses should have the same transaction hash
+    const bodies = await Promise.all(results.map(r => r.json()));
+    const firstTx = bodies[0].transaction;
+    for (const body of bodies) {
+      assert.equal(body.transaction, firstTx, 'all concurrent requests must return the same transaction');
+    }
+  });
 });
