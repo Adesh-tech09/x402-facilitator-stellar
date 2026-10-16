@@ -81,13 +81,11 @@ Reference material: [Architecture](docs/ARCHITECTURE.md) ·
 [Bazaar discovery](docs/BAZAAR.md) · [MCP server](docs/MCP.md) ·
 [Conformance](docs/CONFORMANCE.md) · [Deployment](docs/DEPLOYMENT.md) ·
 [Operations](docs/OPERATIONS.md) · [Authentication](docs/AUTHENTICATION.md) ·
- feat/upstream-drift-watch
 [Threat model](docs/THREAT-MODEL.md) · [Audit readiness](docs/AUDIT.md) ·
 [Privacy](docs/PRIVACY.md) · [Upstream tracking](docs/UPSTREAM.md) ·
 
 [Business model](docs/BUSINESS-MODEL.md) · [Threat model](docs/THREAT-MODEL.md) ·
 [Audit readiness](docs/AUDIT.md) · [Privacy](docs/PRIVACY.md) ·
- main
 [Glossary](docs/GLOSSARY.md) · [Changelog](CHANGELOG.md)
 
 Sibling repositories in the [Accensa organisation](https://github.com/accensa):
@@ -215,7 +213,6 @@ for the log fields and the alert to set on each metric.
 
 ## Conformance
 
- docs/conformance
 Acceptance is tested at the wire level with stock SDK code, not by reading a claim. The
 canonical, citable report — with versions, per-item evidence, settled transaction hashes,
 what fails and why, and commands to reproduce it yourself — is
@@ -382,4 +379,3 @@ and how to run conformance against a branch.
 
 Apache-2.0 — see [LICENSE](LICENSE). Chosen to match upstream `@x402/*` so work here can
 be contributed back.
-// fix

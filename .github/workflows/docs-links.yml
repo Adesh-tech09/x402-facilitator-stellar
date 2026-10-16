@@ -2,20 +2,26 @@ name: docs-links
 
 # Issue #214: nothing verified the links in docs/, so a renamed page could
 # leave the rest of the tree pointing at nothing. This workflow checks every
-# .md file under docs/ with the community markdown-link-check action. 403 and
+# .md file under docs/ and at the repository root (README.md and the other
+# root markdown) with the community markdown-link-check action. 403 and
 # 429 are treated as alive because many documentation hosts (npm, opensource
 # license registries) answer automated checkers with a block rather than an
 # HTML page even though the URL is valid.
+# Issue #490: the root README carried merge-conflict residue as prose while
+# this job only scanned docs/, so the damage passed CI green. The scope below
+# covers the root, and a conflict-marker scan fails the job outright.
 
 on:
   push:
     branches: ['main']
-  # Path-filtered instead of unconditional: this checks links under docs/, so a
-  # code-only PR gained nothing from it. Doc PRs still get the check before
-  # merge; a stale link introduced elsewhere is caught on the merge to `main`.
+  # Path-filtered instead of unconditional: this checks links under docs/ and
+  # the root markdown, so a code-only PR gained nothing from it. Doc PRs still
+  # get the check before merge; a stale link introduced elsewhere is caught on
+  # the merge to `main`.
   pull_request:
     paths:
       - 'docs/**'
+      - '*.md'
       - '.github/markdown-link-check.json'
       - '.github/workflows/docs-links.yml'
 
@@ -29,6 +35,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Fail on merge-conflict markers in markdown
+        run: |
+          if grep -rEn '^(<<<<<<<|=======|>>>>>>>)' --include='*.md' .; then
+            echo 'Merge-conflict markers found in markdown; remove them before merge.'
+            exit 1
+          fi
       - uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
           use-quiet-mode: 'yes'
@@ -36,6 +48,6 @@ jobs:
           checkout: 'yes'
           base-branch: 'main'
           config-file: '.github/markdown-link-check.json'
-          folder-path: 'docs'
+          folder-path: '.'
           file-extension: '.md'
           check-modified-files-only: 'no'
