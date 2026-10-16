@@ -158,13 +158,26 @@ function validatePolicy(paymentPayload, paymentRequirements, result, assetDecima
     }
     // Validate pricing.amount format (#225) to prevent toStroops from throwing later
     if (rawBazaar.pricing?.amount !== undefined) {
-      const asset = rawBazaar.pricing.asset ?? paymentRequirements.asset ?? 'native';
-      const decimals = assetDecimalsMap?.[asset] ?? STELLAR_DECIMALS;
-      const amountErrors = validateAmount(rawBazaar.pricing.amount, decimals);
+      const amountErrors = validateAmount(rawBazaar.pricing.amount);
       if (amountErrors.length > 0) {
         result.hardDrop = true;
         result.reason = 'invalid_pricing_amount';
         return result;
+      }
+      // Reject sub-stroop fractions instead of truncating them (#415): an
+      // amount carrying more precision than its asset supports would settle
+      // short of what the seller stated, silently. The asset's decimals come
+      // from the fetched per-asset cache when available, else the 7-decimal
+      // Stellar default.
+      const asset = rawBazaar.pricing.asset ?? paymentRequirements.asset ?? 'native';
+      const decimals = assetDecimalsMap?.[asset] ?? STELLAR_DECIMALS;
+      if (typeof rawBazaar.pricing.amount === 'string') {
+        const [, fracPart = ''] = rawBazaar.pricing.amount.split('.');
+        if (fracPart.length > decimals) {
+          result.hardDrop = true;
+          result.reason = 'invalid_pricing_amount';
+          return result;
+        }
       }
     }
   }
