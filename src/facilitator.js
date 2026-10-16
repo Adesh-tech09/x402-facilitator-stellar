@@ -57,7 +57,8 @@ export function buildFacilitator(config) {
     }
 
     // Asset decimals cache for SEP-0041 compliance (#415)
-    const rpcUrl = netConfig.rpcUrl ?? (network === TESTNET ? 'https://soroban-testnet.stellar.org' : undefined);
+    const rpcUrl =
+      netConfig.rpcUrl ?? (network === TESTNET ? 'https://soroban-testnet.stellar.org' : undefined);
     assetCaches[network] = createAssetDecimalsCache({
       rpcUrl,
       rpcCall: netConfig.rpcUrl ? globalThis.fetch?.bind(globalThis) : undefined,

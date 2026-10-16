@@ -133,7 +133,12 @@ describe('SEP-41 arbitrary decimals validation (#415)', () => {
 
 describe('Asset decimals cache (#415)', () => {
   test('cache returns preloaded native XLM decimals', async () => {
-    const cache = createAssetDecimalsCache({ preloaded: new Map([['native', 7], ['XLM', 7]]) });
+    const cache = createAssetDecimalsCache({
+      preloaded: new Map([
+        ['native', 7],
+        ['XLM', 7],
+      ]),
+    });
     assert.equal(await cache.getDecimals('native'), 7);
     assert.equal(await cache.getDecimals('XLM'), 7);
     assert.equal(await cache.getDecimals('xlm'), 7);
@@ -141,10 +146,7 @@ describe('Asset decimals cache (#415)', () => {
 
   test('cache rejects unknown asset contract IDs', async () => {
     const cache = createAssetDecimalsCache({ rpcCall: null });
-    await assert.rejects(
-      cache.getDecimals('INVALID'),
-      /Invalid asset contract ID/,
-    );
+    await assert.rejects(cache.getDecimals('INVALID'), /Invalid asset contract ID/);
   });
 
   test('cache deduplicates concurrent fetches for same asset', async () => {

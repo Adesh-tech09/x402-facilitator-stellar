@@ -76,15 +76,25 @@ export function createMultiSignerEngine({
    * @param {string[]} [input.requiredSigners] - allow-list of signer identities (optional)
    * @param {number} [input.expiresInMs] - overrides the engine TTL
    */
-  function createEnvelope({ id, transactionXdr, threshold: t = threshold, requiredSigners = null, expiresInMs: ttl = expiresInMs }) {
-    if (!id || typeof id !== 'string') throw new Error('multi-signer envelope requires a string id');
+  function createEnvelope({
+    id,
+    transactionXdr,
+    threshold: t = threshold,
+    requiredSigners = null,
+    expiresInMs: ttl = expiresInMs,
+  }) {
+    if (!id || typeof id !== 'string')
+      throw new Error('multi-signer envelope requires a string id');
     if (!transactionXdr || typeof transactionXdr !== 'string') {
       throw new Error('multi-signer envelope requires transactionXdr');
     }
     if (!Number.isInteger(t) || t < 1) {
       throw new Error(`multi-signer threshold must be a positive integer, got "${t}"`);
     }
-    if (requiredSigners !== null && (!Array.isArray(requiredSigners) || requiredSigners.length === 0)) {
+    if (
+      requiredSigners !== null &&
+      (!Array.isArray(requiredSigners) || requiredSigners.length === 0)
+    ) {
       throw new Error('multi-signer requiredSigners must be a non-empty array or null');
     }
     if (requiredSigners && t > requiredSigners.length) {
@@ -132,9 +142,7 @@ export function createMultiSignerEngine({
 
   function listPending() {
     purgeExpired();
-    return [...pending.values()]
-      .filter(e => e.status === 'pending')
-      .map(snapshot);
+    return [...pending.values()].filter(e => e.status === 'pending').map(snapshot);
   }
 
   /**
@@ -146,7 +154,8 @@ export function createMultiSignerEngine({
     if (!envelope) throw new Error(`unknown multi-signer envelope "${envelopeId}"`);
     assertLive(envelope);
     if (!signer || typeof signer !== 'string') throw new Error('signature requires a signer id');
-    if (!signature || typeof signature !== 'string') throw new Error('signature requires a signature payload');
+    if (!signature || typeof signature !== 'string')
+      throw new Error('signature requires a signature payload');
     if (envelope.requiredSigners && !envelope.requiredSigners.includes(signer)) {
       throw new Error(`signer "${signer}" is not an authorized co-signer for "${envelopeId}"`);
     }

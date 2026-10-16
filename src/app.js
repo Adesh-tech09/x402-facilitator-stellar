@@ -252,9 +252,17 @@ export async function createApp(
       ? createReadinessChecker(config, {
           breakerStates: extras.breakerStates ?? (() => null),
           catalog,
-          db: extras.dbHealthCheck ?? (config.databaseUrl ? createDbHealthCheck(config.databaseUrl) : null),
-          redis: extras.redisHealthCheck ?? (config.redisUrl ? createRedisHealthCheck(config.redisUrl) : null),
-          rateLimiterBackend: extras.rateLimiterHealthCheck ?? (config.databaseUrl && config.rateLimitStore === 'postgres' ? createRateLimiterHealthCheck(config.databaseUrl) : null),
+          db:
+            extras.dbHealthCheck ??
+            (config.databaseUrl ? createDbHealthCheck(config.databaseUrl) : null),
+          redis:
+            extras.redisHealthCheck ??
+            (config.redisUrl ? createRedisHealthCheck(config.redisUrl) : null),
+          rateLimiterBackend:
+            extras.rateLimiterHealthCheck ??
+            (config.databaseUrl && config.rateLimitStore === 'postgres'
+              ? createRateLimiterHealthCheck(config.databaseUrl)
+              : null),
         })
       : null);
 
@@ -329,7 +337,11 @@ export async function createApp(
         // Ensure native XLM is always present
         assetDecimalsMap.native = 7;
       }
-      const validation = validateForCatalog(body.paymentPayload, body.paymentRequirements, assetDecimalsMap);
+      const validation = validateForCatalog(
+        body.paymentPayload,
+        body.paymentRequirements,
+        assetDecimalsMap,
+      );
       const outcome = {};
 
       if (validation.hardDrop) {

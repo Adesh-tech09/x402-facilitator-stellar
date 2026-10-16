@@ -264,7 +264,10 @@ describe('readiness checker', () => {
     const checker = createReadinessChecker(config, {
       rpcCall: rpcStub(),
       cacheTtlMs: 60_000,
-      db: async () => { dbCalls++; return { ok: true }; },
+      db: async () => {
+        dbCalls++;
+        return { ok: true };
+      },
     });
     await checker.check();
     await checker.check();

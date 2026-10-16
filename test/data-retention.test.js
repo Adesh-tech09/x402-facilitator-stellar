@@ -8,7 +8,9 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Pool } from 'pg';
 
-const TEST_DB_URL = process.env.TEST_DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/x402_facilitator_test';
+const TEST_DB_URL =
+  process.env.TEST_DATABASE_URL ||
+  'postgres://postgres:postgres@localhost:5432/x402_facilitator_test';
 
 function createTestPool() {
   return new Pool({
@@ -165,7 +167,11 @@ describe('data retention job (#413)', () => {
       `INSERT INTO settlement_events (idempotency_key, seq, event_type, payload, recorded_at)
        VALUES ($1, 1, 'SettlementInitiated', $2, $3)
        ON CONFLICT DO NOTHING`,
-      [key, JSON.stringify({ idempotency_key: key, network: 'stellar:testnet', scheme: 'exact' }), recordedAt],
+      [
+        key,
+        JSON.stringify({ idempotency_key: key, network: 'stellar:testnet', scheme: 'exact' }),
+        recordedAt,
+      ],
     );
   }
 
@@ -230,17 +236,16 @@ describe('data retention job (#413)', () => {
     const oldKey = randomKey('old-event');
     const newKey = randomKey('new-event');
     await insertSettlementEvent(pool, oldKey, 100); // 100 days old
-    await insertSettlementEvent(pool, newKey, 30);  // 30 days old
+    await insertSettlementEvent(pool, newKey, 30); // 30 days old
 
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const { rows: before } = await pool.query('SELECT count(*)::int as c FROM settlement_events');
     assert.equal(before[0].c, 2);
 
     // Simulate batch delete
-    const { rowCount } = await pool.query(
-      `DELETE FROM settlement_events WHERE recorded_at < $1`,
-      [cutoff],
-    );
+    const { rowCount } = await pool.query(`DELETE FROM settlement_events WHERE recorded_at < $1`, [
+      cutoff,
+    ]);
 
     const { rows: after } = await pool.query('SELECT count(*)::int as c FROM settlement_events');
     assert.equal(after[0].c, 1);
@@ -263,11 +268,15 @@ describe('data retention job (#413)', () => {
       [cutoff],
     );
 
-    const { rows: after } = await pool.query('SELECT count(*)::int as c FROM settlement_projections');
+    const { rows: after } = await pool.query(
+      'SELECT count(*)::int as c FROM settlement_projections',
+    );
     assert.equal(after[0].c, 1);
     assert.equal(rowCount, 1);
 
-    const { rows: remaining } = await pool.query('SELECT idempotency_key FROM settlement_projections');
+    const { rows: remaining } = await pool.query(
+      'SELECT idempotency_key FROM settlement_projections',
+    );
     assert.equal(remaining[0].idempotency_key, newKey);
   });
 
@@ -279,10 +288,9 @@ describe('data retention job (#413)', () => {
     await insertLegacySettlement(pool, newKey, 30);
 
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const { rowCount } = await pool.query(
-      `DELETE FROM settlements WHERE updated_at < $1`,
-      [cutoff],
-    );
+    const { rowCount } = await pool.query(`DELETE FROM settlements WHERE updated_at < $1`, [
+      cutoff,
+    ]);
 
     const { rows: after } = await pool.query('SELECT count(*)::int as c FROM settlements');
     assert.equal(after[0].c, 1);
@@ -297,10 +305,9 @@ describe('data retention job (#413)', () => {
     await insertIdempotencyKey(pool, newKey, 3);
 
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const { rowCount } = await pool.query(
-      `DELETE FROM idempotency_keys WHERE created_at < $1`,
-      [cutoff],
-    );
+    const { rowCount } = await pool.query(`DELETE FROM idempotency_keys WHERE created_at < $1`, [
+      cutoff,
+    ]);
 
     const { rows: after } = await pool.query('SELECT count(*)::int as c FROM idempotency_keys');
     assert.equal(after[0].c, 1);
@@ -329,8 +336,13 @@ describe('data retention job (#413)', () => {
     assert.equal(after[0].c, 2);
     assert.equal(rowCount, 1);
 
-    const { rows: remaining } = await pool.query('SELECT event_id, status FROM outbox_events ORDER BY event_id');
-    assert.deepEqual(remaining.map(r => r.event_id), [newPublished, oldPending]);
+    const { rows: remaining } = await pool.query(
+      'SELECT event_id, status FROM outbox_events ORDER BY event_id',
+    );
+    assert.deepEqual(
+      remaining.map(r => r.event_id),
+      [newPublished, oldPending],
+    );
   });
 
   test('purges resolved/discarded dead_letters, keeps pending/exhausted', async () => {
@@ -354,10 +366,16 @@ describe('data retention job (#413)', () => {
     assert.equal(after[0].c, 3);
     assert.equal(rowCount, 1);
 
-    const { rows: remaining } = await pool.query('SELECT message_id, status FROM dead_letters ORDER BY message_id');
+    const { rows: remaining } = await pool.query(
+      'SELECT message_id, status FROM dead_letters ORDER BY message_id',
+    );
     assert.deepEqual(
       remaining.map(r => [r.message_id, r.status]),
-      [[newResolved, 'resolved'], [oldPending, 'pending'], [oldExhausted, 'exhausted']],
+      [
+        [newResolved, 'resolved'],
+        [oldPending, 'pending'],
+        [oldExhausted, 'exhausted'],
+      ],
     );
   });
 
@@ -369,10 +387,9 @@ describe('data retention job (#413)', () => {
     await insertRateLimitBucket(pool, newBucket, 3);
 
     const cutoff = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
-    const { rowCount } = await pool.query(
-      `DELETE FROM rate_limit_buckets WHERE reset_at < $1`,
-      [cutoff],
-    );
+    const { rowCount } = await pool.query(`DELETE FROM rate_limit_buckets WHERE reset_at < $1`, [
+      cutoff,
+    ]);
 
     const { rows: after } = await pool.query('SELECT count(*)::int as c FROM rate_limit_buckets');
     assert.equal(after[0].c, 1);

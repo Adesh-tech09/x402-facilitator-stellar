@@ -73,15 +73,17 @@ class Archiver {
   async close() {
     if (this.type === 's3' && this.recordBuffer) {
       const { PutObjectCommand } = await import('@aws-sdk/client-s3');
-      await this.s3.client.send(new PutObjectCommand({
-        Bucket: this.s3.bucket,
-        Key: this.currentFile.replace(`s3://${this.s3.bucket}/`, ''),
-        Body: this.recordBuffer,
-        ContentType: 'application/jsonlines',
-      }));
+      await this.s3.client.send(
+        new PutObjectCommand({
+          Bucket: this.s3.bucket,
+          Key: this.currentFile.replace(`s3://${this.s3.bucket}/`, ''),
+          Body: this.recordBuffer,
+          ContentType: 'application/jsonlines',
+        }),
+      );
     } else if (this.fileHandle) {
       await new Promise((resolve, reject) => {
-        this.fileHandle.end(err => err ? reject(err) : resolve());
+        this.fileHandle.end(err => (err ? reject(err) : resolve()));
       });
     }
   }
@@ -96,7 +98,16 @@ function buildPgPool(databaseUrl) {
   });
 }
 
-async function runBatchDelete(pool, table, whereClause, params, batchSize, sleepMs, archiver, dryRun) {
+async function runBatchDelete(
+  pool,
+  table,
+  whereClause,
+  params,
+  batchSize,
+  sleepMs,
+  archiver,
+  dryRun,
+) {
   let totalDeleted = 0;
   let totalArchived = 0;
 
@@ -295,9 +306,15 @@ Retention periods (from docs/PRIVACY.md):
   const pool = buildPgPool(databaseUrl);
 
   const now = new Date();
-  const settlementCutoff = new Date(now.getTime() - RETENTION_DAYS['settlement records'] * 24 * 60 * 60 * 1000);
-  const requestCutoff = new Date(now.getTime() - RETENTION_DAYS['request logs'] * 24 * 60 * 60 * 1000);
-  const searchCutoff = new Date(now.getTime() - RETENTION_DAYS['search queries'] * 24 * 60 * 60 * 1000);
+  const settlementCutoff = new Date(
+    now.getTime() - RETENTION_DAYS['settlement records'] * 24 * 60 * 60 * 1000,
+  );
+  const requestCutoff = new Date(
+    now.getTime() - RETENTION_DAYS['request logs'] * 24 * 60 * 60 * 1000,
+  );
+  const searchCutoff = new Date(
+    now.getTime() - RETENTION_DAYS['search queries'] * 24 * 60 * 60 * 1000,
+  );
 
   console.log(`=== Data Retention Job ${dryRun ? '(DRY RUN)' : '(APPLY)'} ===`);
   console.log(`Started at: ${now.toISOString()}`);
@@ -307,21 +324,24 @@ Retention periods (from docs/PRIVACY.md):
   console.log(`  Request logs (7d):        ${requestCutoff.toISOString()}`);
   console.log(`  Search queries (30d):     ${searchCutoff.toISOString()} (not yet implemented)`);
   console.log(`Batch size: ${batchSize}, Sleep: ${batchSleepMs}ms`);
-  console.log(`Archive: ${values['archive-type']}${values['archive-type'] === 's3' ? ` (s3://${values['s3-bucket']})` : ` (${values['archive-path']})`}`);
+  console.log(
+    `Archive: ${values['archive-type']}${values['archive-type'] === 's3' ? ` (s3://${values['s3-bucket']})` : ` (${values['archive-path']})`}`,
+  );
   console.log('');
 
   const archiver = new Archiver({
     type: values['archive-type'],
     path: values['archive-path'],
-    s3: values['archive-type'] === 's3'
-      ? {
-          bucket: values['s3-bucket'],
-          client: (async () => {
-            const { S3Client } = await import('@aws-sdk/client-s3');
-            return new S3Client({ region: values['s3-region'] });
-          })(),
-        }
-      : undefined,
+    s3:
+      values['archive-type'] === 's3'
+        ? {
+            bucket: values['s3-bucket'],
+            client: (async () => {
+              const { S3Client } = await import('@aws-sdk/client-s3');
+              return new S3Client({ region: values['s3-region'] });
+            })(),
+          }
+        : undefined,
   });
 
   let archiverOpened = false;
@@ -346,37 +366,51 @@ Retention periods (from docs/PRIVACY.md):
     const tasks = [
       {
         name: 'settlement_events',
-        fn: () => purgeSettlementEvents(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeSettlementEvents(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
         cutoff: settlementCutoff,
       },
       {
         name: 'settlement_projections',
-        fn: () => purgeSettlementProjections(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeSettlementProjections(
+            pool,
+            settlementCutoff,
+            batchSize,
+            batchSleepMs,
+            archiver,
+            dryRun,
+          ),
         cutoff: settlementCutoff,
       },
       {
         name: 'settlements (legacy)',
-        fn: () => purgeLegacySettlements(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeLegacySettlements(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
         cutoff: settlementCutoff,
       },
       {
         name: 'idempotency_keys',
-        fn: () => purgeIdempotencyKeys(pool, requestCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeIdempotencyKeys(pool, requestCutoff, batchSize, batchSleepMs, archiver, dryRun),
         cutoff: requestCutoff,
       },
       {
         name: 'outbox_events (published)',
-        fn: () => purgeOutboxEvents(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeOutboxEvents(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
         cutoff: settlementCutoff,
       },
       {
         name: 'dead_letters (resolved/discarded)',
-        fn: () => purgeDeadLetters(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeDeadLetters(pool, settlementCutoff, batchSize, batchSleepMs, archiver, dryRun),
         cutoff: settlementCutoff,
       },
       {
         name: 'rate_limit_buckets (expired)',
-        fn: () => purgeRateLimitBuckets(pool, requestCutoff, batchSize, batchSleepMs, archiver, dryRun),
+        fn: () =>
+          purgeRateLimitBuckets(pool, requestCutoff, batchSize, batchSleepMs, archiver, dryRun),
         cutoff: requestCutoff,
       },
     ];

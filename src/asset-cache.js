@@ -22,7 +22,11 @@ export function createAssetDecimalsCache({
   rpcCall = globalThis.fetch?.bind(globalThis),
   rpcUrl = 'https://soroban-testnet.stellar.org',
   ttlMs = DEFAULT_TTL_MS,
-  preloaded = new Map([['native', 7], ['XLM', 7], ['xlm', 7]]),
+  preloaded = new Map([
+    ['native', 7],
+    ['XLM', 7],
+    ['xlm', 7],
+  ]),
 } = {}) {
   const cache = new Map(); // assetId -> { decimals, expiresAt }
   const pending = new Map(); // assetId -> Promise<number>
@@ -138,14 +142,16 @@ export function createAssetDecimalsCache({
       return pending.get(normalized);
     }
 
-    const promise = fetchDecimals(normalized).then(decimals => {
-      cache.set(normalized, { decimals, expiresAt: now + ttlMs });
-      pending.delete(normalized);
-      return decimals;
-    }).catch(err => {
-      pending.delete(normalized);
-      throw err;
-    });
+    const promise = fetchDecimals(normalized)
+      .then(decimals => {
+        cache.set(normalized, { decimals, expiresAt: now + ttlMs });
+        pending.delete(normalized);
+        return decimals;
+      })
+      .catch(err => {
+        pending.delete(normalized);
+        throw err;
+      });
 
     pending.set(normalized, promise);
     return promise;

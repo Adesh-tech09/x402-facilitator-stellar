@@ -303,7 +303,12 @@ export function validateDiscoveryPolicy(input, paymentRequirements = {}, assetDe
       result.reason = 'invalid_declaration';
       return result;
     }
-    return validatePolicy(input.paymentPayload, input.paymentRequirements, result, assetDecimalsMap);
+    return validatePolicy(
+      input.paymentPayload,
+      input.paymentRequirements,
+      result,
+      assetDecimalsMap,
+    );
   }
 
   addAdvisories(result, input);
@@ -353,5 +358,9 @@ export function validateDiscoveryPolicy(input, paymentRequirements = {}, assetDe
 }
 
 export function validateForCatalog(paymentPayload, paymentRequirements, assetDecimalsMap = null) {
-  return validateDiscoveryPolicy({ paymentPayload, paymentRequirements }, paymentRequirements, assetDecimalsMap);
+  return validateDiscoveryPolicy(
+    { paymentPayload, paymentRequirements },
+    paymentRequirements,
+    assetDecimalsMap,
+  );
 }
