@@ -69,6 +69,64 @@ export function renderFullMetrics(metricsRegistry) {
 }
 
 /**
+ * Creates a database health check function.
+ * @param {string} databaseUrl - postgres connection string
+ * @returns {Function} async () => { ok: boolean, error?: string }
+ */
+export function createDbHealthCheck(databaseUrl) {
+  return async () => {
+    try {
+      const { default: pg } = await import('pg');
+      const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+      await pool.query('SELECT 1');
+      await pool.end();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+}
+
+/**
+ * Creates a Redis health check function.
+ * @param {string} redisUrl - Redis connection URL
+ * @returns {Function} async () => { ok: boolean, error?: string }
+ */
+export function createRedisHealthCheck(redisUrl) {
+  return async () => {
+    try {
+      const { default: createClient } = await import('redis');
+      const client = createClient({ url: redisUrl });
+      await client.connect();
+      await client.ping();
+      await client.disconnect();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+}
+
+/**
+ * Creates a rate limiter backend health check function.
+ * @param {string} databaseUrl - postgres connection string for the rate limiter store
+ * @returns {Function} async () => { ok: boolean, error?: string }
+ */
+export function createRateLimiterHealthCheck(databaseUrl) {
+  return async () => {
+    try {
+      const { default: pg } = await import('pg');
+      const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+      await pool.query('SELECT 1');
+      await pool.end();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  };
+}
+
+/**
  * Builds the Fastify app.
  *
  * Takes its collaborators rather than reaching for module state, which is what
@@ -79,7 +137,7 @@ export function renderFullMetrics(metricsRegistry) {
  * @param {object} config - resolved config from resolveConfig()
  * @param {{verify: Function, settle: Function, getSupported: Function}} facilitator
  * @param {object} rateLimiter - RateLimiter, or a stub with the same surface
- * @param {{upsertResource: Function, listResources: Function, search?: Function, getResource?: Function, getVersion?: Function, getLastModified?: Function}} catalog
+ * @param {{keyFor: Function, listResources: Function, search?: Function, getResource?: Function, getVersion?: Function, getLastModified?: Function}} catalog
  * @param {{keyFor: Function, begin: Function, complete: Function}} [idempotency]
  * @param {object} [extras] - optional collaborators
  * @returns {Promise<import('fastify').FastifyInstance>}
