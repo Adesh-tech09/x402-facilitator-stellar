@@ -52,74 +52,20 @@ function describeThrown(err) {
 }
 
 /**
- * Creates a database health check function.
- * Returns a function that checks database connectivity with a short timeout.
+ * Renders the full Prometheus exposition served on every /metrics surface
+ * (#492).
+ *
+ * Both the app's GET /metrics route and the dedicated METRICS_PORT listener
+ * in server.js must serve the same series: the registry plus the
+ * signer-selection series. A future metric added to only one surface would
+ * silently drop alert data on the other, so there is exactly one function
+ * that builds the exposition and both listeners call it.
+ *
+ * @param {object} metricsRegistry - registry from createMetrics()
+ * @returns {string} full Prometheus exposition text
  */
-function createDbHealthCheck(databaseUrl) {
-  return async () => {
-    const { Pool } = await import('pg');
-    const pool = new Pool({
-      connectionString: databaseUrl,
-      connectionTimeoutMillis: 2000,
-      max: 1,
-    });
-    try {
-      await pool.query('SELECT 1');
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    } finally {
-      await pool.end().catch(() => {});
-    }
-  };
-}
-
-/**
- * Creates a Redis health check function.
- * Returns a function that checks Redis connectivity with a short timeout.
- */
-function createRedisHealthCheck(redisUrl) {
-  return async () => {
-    const { default: Redis } = await import('ioredis');
-    const client = new Redis(redisUrl, {
-      connectTimeout: 2000,
-      maxRetriesPerRequest: 1,
-      retryStrategy: () => null,
-    });
-    try {
-      await client.ping();
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    } finally {
-      await client.quit().catch(() => {});
-    }
-  };
-}
-
-/**
- * Creates a rate limiter backend health check function.
- * Checks the Postgres rate_limit_buckets table connectivity.
- */
-function createRateLimiterHealthCheck(databaseUrl) {
-  return async () => {
-    const { Pool } = await import('pg');
-    const pool = new Pool({
-      connectionString: databaseUrl,
-      connectionTimeoutMillis: 2000,
-      max: 1,
-    });
-    try {
-      await pool.query('SELECT 1 FROM rate_limit_buckets LIMIT 1');
-      return { ok: true };
-    } catch (err) {
-      // Table might not exist yet - that's ok for health check
-      if (err.code === '42P01') return { ok: true };
-      return { ok: false, error: err.message };
-    } finally {
-      await pool.end().catch(() => {});
-    }
-  };
+export function renderFullMetrics(metricsRegistry) {
+  return metricsRegistry.render() + signerMetrics.toPrometheusText();
 }
 
 /**
@@ -476,7 +422,7 @@ export async function createApp(
   if (serveMetrics) {
     app.get('/metrics', async (_req, reply) => {
       reply.header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
-      return reply.send(metrics.render() + signerMetrics.toPrometheusText());
+      return reply.send(renderFullMetrics(metrics));
     });
   }
 
