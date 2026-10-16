@@ -345,6 +345,12 @@ Inputs pinned (same locked dependencies as every run here):
 | Payer | deployed contract account (C-address) owning the transfer; three instances: no cap, cap `1,000,000` stroops, cap `500` stroops |
 | Asset / amount | XLM (SAC) / 1,000 stroops, facilitator-sponsored fee |
 
+The run is wired into CI: `.github/workflows/conformance-run.yml` executes
+`npm run e2e:smart-account` after the upstream suite and reports its pass/fail
+in the job summary (see the `conformance-output` artifact for the captured
+log). It needs no secrets — it self-funds through friendbot and spawns its own
+facilitator — so the prerequisites below apply only to a manual run.
+
 Results:
 
 | Scenario | Outcome | Evidence |
