@@ -24,13 +24,19 @@ test('README has no merge-conflict residue as prose (#490, README.md:84)', () =>
 });
 
 test('docs-links job covers the repository root and scans for conflict markers (#490)', () => {
-  // Block-scoped YAML parse would be ideal; string assertions pin the gate.
+  // The docs/ action step keeps its original scope; a dedicated step checks
+  // the root markdown so subdirectory surfaces owned elsewhere stay out.
   assert.match(
     WORKFLOW,
-    /folder-path:\s*['"]?\.\s*['"]?/,
-    'job must check the repo root, not docs/ only',
+    /folder-path:\s*['"]docs['"]/,
+    'the docs action step must keep checking docs/',
   );
-  assert.ok(!WORKFLOW.match(/folder-path:\s*['"]docs['"]/m), 'old docs-only scope remains');
+  assert.match(WORKFLOW, /Check root markdown links/, 'a root-markdown link step must exist');
+  assert.match(WORKFLOW, /\*\.md/, 'the root step must cover the root markdown files');
   assert.match(WORKFLOW, /gulp|grep|conflict|<<<<<<</i, 'job must include a conflict-marker scan');
   assert.match(WORKFLOW, /'\*\.md'/, 'pull_request paths must include root markdown');
+  assert.ok(
+    !WORKFLOW.match(/^\s*checkout:\s*/m),
+    "'checkout' is not a valid action input and must not be passed",
+  );
 });
