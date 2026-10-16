@@ -191,10 +191,14 @@ Everything in `scripts/`, and where it is documented:
 | `e2e.mjs` | `npm run e2e` | End-to-end x402 payment against a running facilitator on testnet. |
 | `fund-testnet-accounts.mjs` | `npm run testnet:fund` | Generates and friendbot-funds the three testnet accounts the suite needs. |
 | `prepare-testnet-usdc.mjs` | `npm run testnet:usdc` | Gives the payer and payee USDC trustlines and a funded balance. |
-| `select-conformance-components.mjs` | (CI, `conformance.yml`) | Decides which upstream e2e components a run exercises; documented in docs/CONFORMANCE.md. |
+| `e2e-smart-account.mjs` | `npm run e2e:smart-account` | End-to-end x402 payment from a `__check_auth` smart-account payer on testnet; documented in docs/CONFORMANCE.md. |
+| `db-migrate.js` | `npm run db:migrate` | Applies pending database migrations against `DATABASE_URL`; documented in docs/MIGRATIONS.md. |
+| `check-migration-compat.js` | `npm run check:migration` | Fails on migration patterns that break zero-downtime deploys (drops, renames, NOT NULL without DEFAULT); a CI gate. |
+| `select-conformance-components.mjs` | (CI, `conformance-run.yml`) | Decides which upstream e2e components a run exercises; documented in docs/CONFORMANCE.md. |
 | `bench-http.mjs` | `npm run bench` | Local throughput benchmark of the HTTP surface with stubbed collaborators. |
 | `bench-http.mjs --budget` | `npm run test:bench` | Resource-budget run: peak RSS, CPU and open sockets, markdown report in `bench-results/`; fails above 512 MiB or on a >20% duration regression (#427). |
 | `bench-cataloging.mjs` | `npm run bench:cataloging` | Cataloging hot-path benchmark: sequential `POST /settle` ops/sec, latency percentiles and GC count with catalogable bodies (#368). |
+| `bench-signer-contention.mjs` | `npm run bench:signer` | Parameterised model of where one Stellar signer stops keeping up as offered concurrency rises (#203); discussed in docs/OPERATIONS.md. |
 | `check-conformance-staleness.mjs` | (CI gate) | Fails if docs/CONFORMANCE.md is stale relative to main facilitator commit SHA. |
 | `data_retention_job.js` | — | **Not implemented.** Exits non-zero on purpose: it is scheduled to enforce the docs/PRIVACY.md retention periods once a datastore exists, and nothing is purged until then. Tracked in [Issue #50](https://github.com/accensa/x402-facilitator-stellar/issues/50). |
 
