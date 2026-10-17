@@ -4,6 +4,7 @@
  */
 
 import crypto from 'node:crypto';
+import { StrKey } from '@stellar/stellar-sdk';
 
 /** CAIP-2 identifiers. Both are committed deliverables in the RFP, not one or the other. */
 export const TESTNET = 'stellar:testnet';
@@ -67,7 +68,11 @@ function parseSecrets(env, pluralKey, singularKey) {
 
   const seen = new Set();
   for (const s of secrets) {
-    if (!s.startsWith('S')) {
+    // A checksum-aware StrKey decode, not a first-character test (#498): a
+    // truncated, wrongly-prefixed or bad-checksum string starts with "S" and
+    // used to pass here, only to fail later inside createEd25519Signer. The
+    // decode is deliberately stateless — the secret is never echoed back.
+    if (!StrKey.isValidEd25519SecretSeed(s)) {
       throw new Error(`Facilitator secret key must be a Stellar secret key (starts with S).`);
     }
     if (seen.has(s)) {
@@ -81,7 +86,8 @@ function parseSecrets(env, pluralKey, singularKey) {
 function parseOptionalSecret(env, key) {
   const raw = env[key]?.trim();
   if (!raw) return null;
-  if (!raw.startsWith('S')) {
+  // Same checksum-aware decode as parseSecrets (#498).
+  if (!StrKey.isValidEd25519SecretSeed(raw)) {
     throw new Error(`${key} must be a valid Stellar secret key (starts with S).`);
   }
   return raw;

@@ -97,6 +97,12 @@ pinned.
 
 ### Changed
 
+- The container runs with production semantics (#495): the image sets
+  `NODE_ENV=production` and the facilitator service in `docker-compose.yml`
+  pins it, so the production-only HSTS header is sent and a stray `.env` in the
+  build context is no longer loaded at runtime. The image's `CMD` is now
+  `node src/server.js` instead of `npm start`, so SIGTERM/SIGINT reach the
+  server's graceful-shutdown handlers.
 - **Behaviour change:** the dedicated metrics listener binds to `METRICS_HOST`
   (default `127.0.0.1` loopback) instead of `0.0.0.0` (#491). An operator that
   relied on scraping `METRICS_PORT` from another host must now set
@@ -116,6 +122,15 @@ pinned.
 
 ### Fixed
 
+- Signer secrets are validated with a checksum-aware StrKey decode (#498) in
+  `resolveConfig` and `KeyManager`, so a truncated, wrongly-prefixed or
+  bad-checksum secret is refused at boot — or when a remote key source is read —
+  instead of failing later inside the signer factory. Error messages keep their
+  existing wording and never echo the secret.
+- The MCP CLI fails closed on a malformed `MAX_FEE_PER_CALL_STROOPS` or
+  `MAX_SESSION_SPEND_STROOPS`: the error names the variable and the expected
+  unit and the process exits non-zero, instead of a bare `SyntaxError` escaping
+  while the module loads (#497).
 - README merge-conflict residue removed and the docs-links gate widened to the
   repository root with a conflict-marker scan, so root README damage fails CI
   (#490).
