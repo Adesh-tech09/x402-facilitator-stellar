@@ -626,47 +626,23 @@ export async function createApp(
           return rejectRateLimited(req, reply, '/settle', checkSettle, audit);
 
         const idempotencyKey = settlementStore.deriveIdempotencyKey(req);
-        const existingRecord = await settlementStore.get(idempotencyKey);
+        // Tenant-safe store key: keyed callers scope the idempotency namespace
+        // by their API key so one caller cannot read another caller's settled
+        // response. Open-mode callers (req.keyId === undefined) keep the
+        // byte-identical derivation so single-process dedup is unchanged.
+        const storeKey = req.keyId ? `${req.keyId}:${idempotencyKey}` : idempotencyKey;
+        const existingRecord = await settlementStore.get(storeKey);
 
         if (existingRecord) {
-          if (existingRecord.state === 'settled') {
-            const limited = handleRateLimit(reply, checkSettle);
-            if (limited) return limited;
-            if (existingRecord.response) {
-              const respPayload =
-                typeof existingRecord.response === 'string'
-                  ? JSON.parse(existingRecord.response)
-                  : existingRecord.response;
-              return reply.send(respPayload);
-            }
-            return reply.send({
-              success: true,
-              transaction: existingRecord.tx_hash,
-              network: existingRecord.network,
-              payer: existingRecord.payer,
-            });
-          }
-          if (existingRecord.state === 'submitted' || existingRecord.state === 'unknown') {
-            const limited = handleRateLimit(reply, checkSettle);
-            if (limited) return limited;
-            return reply.send({
-              success: false,
-              errorReason: 'submitted_outcome_unknown',
-              errorMessage:
-                existingRecord.error_message || 'settlement in progress or outcome unknown',
-              transaction: existingRecord.tx_hash || '',
-              network: existingRecord.network,
-            });
-          }
-          if (existingRecord.state === 'failed') {
-            const RETRYABLE = new Set([
-              'rate_limited',
-              'catalog_rate_limited',
-              'soroban_rpc_unreachable',
-              'lock_timeout',
-              'request_timeout',
-            ]);
-            if (!RETRYABLE.has(existingRecord.error_reason)) {
+          // A record whose key_id is set and differs from this caller must not
+          // be replayed, mirroring the status-read scoping at
+          // GET /settlements/:idempotencyKey (src/app.js:845-847).
+          const ownedByThisCaller =
+            !existingRecord.key_id ||
+            !req.keyId ||
+            existingRecord.key_id.toUpperCase() === req.keyId.toUpperCase();
+          if (ownedByThisCaller) {
+            if (existingRecord.state === 'settled') {
               const limited = handleRateLimit(reply, checkSettle);
               if (limited) return limited;
               if (existingRecord.response) {
@@ -677,18 +653,56 @@ export async function createApp(
                 return reply.send(respPayload);
               }
               return reply.send({
+                success: true,
+                transaction: existingRecord.tx_hash,
+                network: existingRecord.network,
+                payer: existingRecord.payer,
+              });
+            }
+            if (existingRecord.state === 'submitted' || existingRecord.state === 'unknown') {
+              const limited = handleRateLimit(reply, checkSettle);
+              if (limited) return limited;
+              return reply.send({
                 success: false,
-                errorReason: existingRecord.error_reason,
-                errorMessage: existingRecord.error_message,
+                errorReason: 'submitted_outcome_unknown',
+                errorMessage:
+                  existingRecord.error_message || 'settlement in progress or outcome unknown',
                 transaction: existingRecord.tx_hash || '',
                 network: existingRecord.network,
               });
+            }
+            if (existingRecord.state === 'failed') {
+              const RETRYABLE = new Set([
+                'rate_limited',
+                'catalog_rate_limited',
+                'soroban_rpc_unreachable',
+                'lock_timeout',
+                'request_timeout',
+              ]);
+              if (!RETRYABLE.has(existingRecord.error_reason)) {
+                const limited = handleRateLimit(reply, checkSettle);
+                if (limited) return limited;
+                if (existingRecord.response) {
+                  const respPayload =
+                    typeof existingRecord.response === 'string'
+                      ? JSON.parse(existingRecord.response)
+                      : existingRecord.response;
+                  return reply.send(respPayload);
+                }
+                return reply.send({
+                  success: false,
+                  errorReason: existingRecord.error_reason,
+                  errorMessage: existingRecord.error_message,
+                  transaction: existingRecord.tx_hash || '',
+                  network: existingRecord.network,
+                });
+              }
             }
           }
         }
 
         await settlementStore.save({
-          idempotency_key: idempotencyKey,
+          idempotency_key: storeKey,
           network: body.paymentRequirements.network,
           scheme: body.paymentRequirements.scheme,
           payer: body.paymentPayload?.payer ?? null,
@@ -702,6 +716,7 @@ export async function createApp(
         const idemReq = {
           get: name => req.headers[name.toLowerCase()],
           body: req.body,
+          keyId: req.keyId ?? null,
         };
         const replay = idempotency ? await idempotency.begin(idempotency.keyFor(idemReq)) : null;
         if (replay?.replayed) {
@@ -766,7 +781,7 @@ export async function createApp(
                   : null;
 
                 const enqueued = await settlementStore.settleAndEnqueue(
-                  idempotencyKey,
+                  storeKey,
                   { tx_hash: result.transaction, response: result },
                   event,
                 );
@@ -816,7 +831,7 @@ export async function createApp(
                 return result;
               }
 
-              await settlementStore.updateState(idempotencyKey, 'failed', {
+              await settlementStore.updateState(storeKey, 'failed', {
                 tx_hash: result.transaction || null,
                 error_reason: result.errorReason || 'facilitator_error',
                 error_message: result.errorMessage || null,
@@ -920,7 +935,7 @@ export async function createApp(
           }
 
           const targetState = errorReason === 'submitted_outcome_unknown' ? 'unknown' : 'failed';
-          await settlementStore.updateState(idempotencyKey, targetState, {
+          await settlementStore.updateState(storeKey, targetState, {
             tx_hash: transaction,
             error_reason: errorReason,
             error_message: describeThrown(err),
@@ -949,10 +964,13 @@ export async function createApp(
     },
     async (req, reply) => {
       const { idempotencyKey } = req.params;
+      // Tenant-safe lookup key mirrors the write-side derivation so a caller
+      // reads only their own records under the same key they settled with.
+      const lookupKey = req.keyId ? `${req.keyId}:${idempotencyKey}` : idempotencyKey;
       const record =
         typeof settlementStore.getConsistent === 'function'
-          ? await settlementStore.getConsistent(idempotencyKey)
-          : await settlementStore.get(idempotencyKey);
+          ? await settlementStore.getConsistent(lookupKey)
+          : await settlementStore.get(lookupKey);
       if (!record) {
         return reply.code(404).send({ error: 'not_found', message: 'Settlement record not found' });
       }
@@ -973,7 +991,9 @@ export async function createApp(
     },
     async (req, reply) => {
       const { idempotencyKey } = req.params;
-      const record = await settlementStore.get(idempotencyKey);
+      // Tenant-safe lookup key mirrors the write-side derivation.
+      const lookupKey = req.keyId ? `${req.keyId}:${idempotencyKey}` : idempotencyKey;
+      const record = await settlementStore.get(lookupKey);
       if (!record) {
         return reply.code(404).send({ error: 'not_found', message: 'Settlement record not found' });
       }
@@ -982,7 +1002,7 @@ export async function createApp(
         return reply.code(404).send({ error: 'not_found', message: 'Settlement record not found' });
       }
 
-      const events = await settlementStore.getEventLog(idempotencyKey);
+      const events = await settlementStore.getEventLog(lookupKey);
       return reply.send({ ok: true, idempotencyKey, events });
     },
   );
