@@ -476,10 +476,16 @@ export async function createApp(
 
   app.get('/supported', { onRequest: cors('public') }, async () => facilitator.getSupported());
 
-  app.get('/usage', { preHandler: requireApiKeyStrict }, async req => {
-    annotateSpan({ 'tenant.id': req.keyId ?? 'open', 'http.route': '/usage' });
-    return rateLimiter.getUsage(req.keyId);
-  });
+  app.get(
+    '/usage',
+    // Authenticated class, as src/cors.js and docs/AUTHENTICATION.md both
+    // classify it: a key-carrying route never defaults open.
+    { onRequest: cors('authenticated'), preHandler: requireApiKeyStrict },
+    async req => {
+      annotateSpan({ 'tenant.id': req.keyId ?? 'open', 'http.route': '/usage' });
+      return rateLimiter.getUsage(req.keyId);
+    },
+  );
 
   if (serveMetrics) {
     app.get('/metrics', async (_req, reply) => {
@@ -1323,6 +1329,27 @@ export async function createApp(
   );
   app.options('/verify', { onRequest: cors('authenticated') }, preflight('authenticated'));
   app.options('/settle', { onRequest: cors('authenticated') }, preflight('authenticated'));
+  // The authenticated GET routes: every call carries Authorization, so a
+  // browser preflights each of them — and without these routes the preflight
+  // fell through to the 404 handler, handing the caller `route_not_found`
+  // instead of a CORS verdict. The verb list is explicit because the class
+  // default (`POST, OPTIONS`) would advertise a method these routes do not
+  // serve.
+  app.options(
+    '/usage',
+    { onRequest: cors('authenticated') },
+    preflight('authenticated', 'GET, OPTIONS'),
+  );
+  app.options(
+    '/settlements/:idempotencyKey',
+    { onRequest: cors('authenticated') },
+    preflight('authenticated', 'GET, OPTIONS'),
+  );
+  app.options(
+    '/settlements/:idempotencyKey/events',
+    { onRequest: cors('authenticated') },
+    preflight('authenticated', 'GET, OPTIONS'),
+  );
 
   // ---------------------------------------------------------------------------
   // 404 and Error Handlers

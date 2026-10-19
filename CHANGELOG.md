@@ -122,6 +122,14 @@ pinned.
 
 ### Fixed
 
+- CORS now covers the two surfaces the documentation already classified as
+  authenticated. `GET /usage` carries `onRequest: cors('authenticated')`, so an
+  allowlisted origin gets a reflected `Access-Control-Allow-Origin` (a denied
+  origin still gets none), and `OPTIONS` routes exist for `GET /usage`,
+  `GET /settlements/:idempotencyKey` and `GET /settlements/:idempotencyKey/events`,
+  advertising `GET, OPTIONS`. Previously a browser preflighting any of the three
+  fell through to the not-found handler and received `404 route_not_found`
+  instead of a CORS verdict. Pinned by HTTP-level tests in `test/cors.test.js`.
 - Signer secrets are validated with a checksum-aware StrKey decode (#498) in
   `resolveConfig` and `KeyManager`, so a truncated, wrongly-prefixed or
   bad-checksum secret is refused at boot — or when a remote key source is read —
