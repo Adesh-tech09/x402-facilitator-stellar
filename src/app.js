@@ -248,7 +248,11 @@ export async function createApp(
     done?.();
   });
 
-  const audit = extras.audit ?? createAuditLogger();
+  const audit = extras.audit ?? createAuditLogger({ file: config.auditLogFile });
+  // The limiter audits trusted-CIDR bypasses (#410). Stubs used by tests have
+  // no setAudit, so this stays optional.
+  rateLimiter?.setAudit?.(audit);
+  if (typeof app.decorate === 'function') app.decorate('auditLogger', audit);
 
   const readiness =
     extras.readiness ??
@@ -703,7 +707,18 @@ export async function createApp(
         if (replay?.replayed) {
           const limited = handleRateLimit(reply, checkSettle);
           if (limited) return limited;
+          reply.header('Idempotency-Replay', 'true');
           return reply.code(replay.statusCode).send(replay.response);
+        }
+        if (replay?.conflict) {
+          const limited = handleRateLimit(reply, checkSettle);
+          if (limited) return limited;
+          reply.header('Idempotency-Replay', 'false');
+          return reply.code(409).send({
+            success: false,
+            errorReason: 'idempotency_conflict',
+            errorMessage: 'a request with this Idempotency-Key is already in flight',
+          });
         }
 
         const lockKey = distributedLock ? lockKeyFor(body.paymentPayload) : null;
@@ -892,6 +907,18 @@ export async function createApp(
           ) {
             transaction = body.paymentPayload.transaction;
           }
+          // Release our claim only when we know no transaction was submitted:
+          // a retry must be able to try again after a pre-submission failure,
+          // while an outcome-unknown claim stays held until completion.
+          if (
+            replay &&
+            !replay.replayed &&
+            !replay.conflict &&
+            errorReason !== 'submitted_outcome_unknown'
+          ) {
+            await Promise.resolve(idempotency?.fail?.(replay.key)).catch(() => {});
+          }
+
           const targetState = errorReason === 'submitted_outcome_unknown' ? 'unknown' : 'failed';
           await settlementStore.updateState(idempotencyKey, targetState, {
             tx_hash: transaction,
